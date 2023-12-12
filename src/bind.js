@@ -9,14 +9,6 @@ const newId = () => {
   return `${Date.now()}${idCounter}`;
 };
 
-/**
- * Binds eventListener for 'input' events to an input field to automagically replace values with kana
- * Can pass `{ IMEMode: 'toHiragana' || 'toKatakana' }` to enforce kana conversion type
- * @param  {HTMLInputElement | HTMLTextAreaElement} element textarea, input[type="text"] etc
- * @param  {DefaultOptions} [options=defaultOptions] defaults to { IMEMode: true } using `toKana`
- * @example
- * bind(document.querySelector('#myInput'));
- */
 function bind(element = {}, options = {}, debug = false) {
   if (!ELEMENTS.includes(element.nodeName)) {
     throw new Error(
@@ -28,7 +20,40 @@ function bind(element = {}, options = {}, debug = false) {
   if (element.hasAttribute('data-wanakana-id')) {
     return;
   }
-  const onInput = makeOnInput(options);
+
+  let frontPart = '';
+  let backPart = '';
+
+  // Function to update front and back parts based on cursor position
+  const updateParts = (element) => {
+    const cursorPosition = element.selectionStart;
+    frontPart = element.value.substring(0, cursorPosition);
+    backPart = element.value.substring(cursorPosition);
+  };
+
+  // Modify the onInput function
+  const onInput = (event) => {
+    const currentValue = event.target.value;
+    const cursorPosition = event.target.selectionStart;
+    updateParts(event.target);
+
+    // Extract the new text
+    const newText = currentValue.substring(frontPart.length, currentValue.length - backPart.length);
+    const convertedNewText = makeOnInput(options)(newText);
+
+    // Reconstruct the entire string
+    event.target.value = frontPart + convertedNewText + backPart;
+
+    // Update cursor position
+    const newCursorPosition = frontPart.length + convertedNewText.length;
+    event.target.setSelectionRange(newCursorPosition, newCursorPosition);
+  };
+
+  // Event listener for cursor position update
+  element.addEventListener('click', () => updateParts(element));
+  element.addEventListener('keyup', () => updateParts(element));
+
+  // Rest of the existing code for setting up attributes and listeners
   const id = newId();
   const attributes = [
     { name: 'data-wanakana-id', value: id },
